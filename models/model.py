@@ -3,6 +3,7 @@ from models.attention import attention
 from models.lstm import BNLSTMCell
 import tensorflow as tf
 
+
 class Model(BaseModel):
   def __init__(self, config):
     super(Model, self).__init__(config)
@@ -60,7 +61,7 @@ class Model(BaseModel):
       raise NotImplementedError
 
     # Add dropout, as the model otherwise quickly overfits
-    outputs = tf.layers.dropout(outputs, self.config.dropout_rate, training=self.is_training)
+    # outputs = tf.layers.dropout(outputs, self.config.dropout_rate, training=self.is_training)
 
     # next location indices
     idx = tf.range(batch_size) * tf.shape(outputs)[1] + (self.sequence_lengths - 1)
@@ -87,14 +88,13 @@ class Model(BaseModel):
       else:
         self.loss = tf.reduce_mean(cross_entropy)
 
-      # Gradient clipping
-      trained_vars = tf.trainable_variables()
-      grads, global_norm = tf.clip_by_global_norm(
-        tf.gradients(self.loss, trained_vars),
-        self.config.max_grad_norm
-      )
+      # Optimization
       optimizer = tf.train.AdamOptimizer(self.config.learning_rate)
-      self.train_step = optimizer.apply_gradients(zip(grads, trained_vars), global_step=self.global_train_step_tensor)
+      # Gradient clipping
+      gvs = optimizer.compute_gradients(self.loss)
+      capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gvs]
+      # Update parameters
+      self.train_step = optimizer.apply_gradients(capped_gvs, global_step=self.global_train_step_tensor)
 
     with tf.name_scope("acc"):
       # count correct only for the last location in the sequences

@@ -1,19 +1,19 @@
 import numpy as np
 import random
+import os
 
 class DataGenerator:
   def __init__(self, config):
     self.config = config
     # load data here
-    data = []
-    with open('data/idxseq.txt', 'r') as data_file:
+    self.train_data = []
+    self.test_data = []
+    with open(os.path.join('../data/', config.data_set, 'train.txt'), 'r') as data_file:
       for line in data_file:
-        data.append(line.strip().split())
-    random.shuffle(data)
-    train_ratio = 0.8
-    split_idx = int(len(data) * train_ratio)
-    self.train_data = data[:split_idx]
-    self.test_data = data[split_idx:]
+        self.train_data.append(line.strip().split())
+    with open(os.path.join('../data/', config.data_set, 'test.txt'), 'r') as data_file:
+      for line in data_file:
+        self.test_data.append(line.strip().split())
     self.config.num_train_iter_per_epoch = int(len(self.train_data) / self.config.batch_size)
     if self.config.num_train_iter_per_epoch * self.config.batch_size < len(self.train_data):
       self.config.num_train_iter_per_epoch += 1

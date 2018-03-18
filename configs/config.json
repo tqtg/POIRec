@@ -1,16 +1,14 @@
 {
   "exp_name": "POI",
-  "cell": "LSTM",
+  "data_set": "NYC",
+  "cell": "GRU",
   "attention": false,
-  "seq2seq": true,
+  "seq2seq": false,
   "num_epochs": 30,
   "summarize_steps": 10,
   "batch_size": 32,
   "learning_rate": 1e-2,
   "dropout_rate": 0.5,
-  "max_grad_norm": 5.0,
   "max_to_keep": 5,
-  "num_hidden": 32,
-  "num_loc": 1392,
-  "num_user": 198
+  "num_hidden": 32
 }
