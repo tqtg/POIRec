@@ -27,13 +27,10 @@ class Model(BaseModel):
     location_embeddings = tf.get_variable('loc_embedding_matrix', [self.config.num_loc + 1, self.config.num_hidden])
     embedded_locations = tf.nn.embedding_lookup(location_embeddings, self.location_sequences)
 
-    if self.config.personalized:
-      user_embeddings = tf.get_variable('user_embedding_matrix', [self.config.num_user + 1, self.config.num_hidden])
-      embedded_users = tf.nn.embedding_lookup(user_embeddings, self.users)
-      embedded_users = tf.expand_dims(embedded_users, axis=1)
-      inputs = tf.multiply(embedded_users, embedded_locations)
-    else:
-      inputs = embedded_locations
+    user_embeddings = tf.get_variable('user_embedding_matrix', [self.config.num_user + 1, self.config.num_hidden])
+    embedded_users = tf.nn.embedding_lookup(user_embeddings, self.users)
+    embedded_users = tf.expand_dims(embedded_users, axis=1)
+    inputs = tf.multiply(embedded_users, embedded_locations)
 
     # RNN
     if self.config.cell == "LSTM":
