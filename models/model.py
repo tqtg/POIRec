@@ -1,7 +1,8 @@
+import tensorflow as tf
+
 from base.base_model import BaseModel
 from models.attention import attention
 from models.lstm import BNLSTMCell
-import tensorflow as tf
 
 
 class Model(BaseModel):
@@ -26,11 +27,13 @@ class Model(BaseModel):
     location_embeddings = tf.get_variable('loc_embedding_matrix', [self.config.num_loc + 1, self.config.num_hidden])
     embedded_locations = tf.nn.embedding_lookup(location_embeddings, self.location_sequences)
 
-    user_embeddings = tf.get_variable('user_embedding_matrix', [self.config.num_user + 1, self.config.num_hidden])
-    embedded_users = tf.nn.embedding_lookup(user_embeddings, self.users)
-    embedded_users = tf.expand_dims(embedded_users, axis=1)
-
-    inputs = tf.multiply(embedded_users, embedded_locations)
+    if self.config.persionalized:
+      user_embeddings = tf.get_variable('user_embedding_matrix', [self.config.num_user + 1, self.config.num_hidden])
+      embedded_users = tf.nn.embedding_lookup(user_embeddings, self.users)
+      embedded_users = tf.expand_dims(embedded_users, axis=1)
+      inputs = tf.multiply(embedded_users, embedded_locations)
+    else:
+      inputs = embedded_locations
 
     # RNN
     if self.config.cell == "LSTM":
