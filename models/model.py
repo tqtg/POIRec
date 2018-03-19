@@ -23,10 +23,10 @@ class Model(BaseModel):
     batch_size = tf.shape(self.sequence_lengths)[0]
 
     # Embedding layer
-    location_embeddings = tf.get_variable('loc_embedding_matrix', [self.config.num_loc, self.config.num_hidden])
+    location_embeddings = tf.get_variable('loc_embedding_matrix', [self.config.num_loc + 1, self.config.num_hidden])
     embedded_locations = tf.nn.embedding_lookup(location_embeddings, self.location_sequences)
 
-    user_embeddings = tf.get_variable('user_embedding_matrix', [self.config.num_user, self.config.num_hidden])
+    user_embeddings = tf.get_variable('user_embedding_matrix', [self.config.num_user + 1, self.config.num_hidden])
     embedded_users = tf.nn.embedding_lookup(user_embeddings, self.users)
     embedded_users = tf.expand_dims(embedded_users, axis=1)
 
@@ -100,9 +100,11 @@ class Model(BaseModel):
       # count correct only for the last location in the sequences
       if self.config.seq2seq:
         logits = tf.gather(logits, idx)
-      self.correct_prediction = tf.equal(tf.cast(tf.argmax(logits, 1), tf.int32), self.next_locations)
-      self.num_corrects = tf.reduce_sum(tf.cast(self.correct_prediction, tf.int32))
-      self.accuracy = tf.reduce_mean(tf.cast(self.correct_prediction, tf.float32))
+      # self.correct_prediction = tf.equal(tf.cast(tf.argmax(logits, 1), tf.int32), self.next_locations)
+      # self.num_corrects = tf.reduce_sum(tf.cast(self.correct_prediction, tf.int32))
+      # self.accuracy = tf.reduce_mean(tf.cast(self.correct_prediction, tf.float32))
+      _, self.top_k = tf.nn.top_k(logits, k=self.config.K)
+
 
   def init_saver(self):
     # here you initialize the tensorflow saver that will be used in saving the checkpoints.

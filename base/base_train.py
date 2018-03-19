@@ -10,7 +10,7 @@ class BaseTrain:
     self.data = data
     self.init = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
     self.best_loss = float('inf')
-    self.best_acc = 0
+    self.best_precision = 0
     self.best_epoch = 0
     self.sess.run(self.init)
 

@@ -8,10 +8,10 @@ class DataGenerator:
     # load data here
     self.train_data = []
     self.test_data = []
-    with open(os.path.join('../data/', config.data_set, 'train.txt'), 'r') as data_file:
+    with open(os.path.join('data/', config.data_set, 'train.txt'), 'r') as data_file:
       for line in data_file:
         self.train_data.append(line.strip().split())
-    with open(os.path.join('../data/', config.data_set, 'test.txt'), 'r') as data_file:
+    with open(os.path.join('data/', config.data_set, 'test.txt'), 'r') as data_file:
       for line in data_file:
         self.test_data.append(line.strip().split())
     self.config.num_train_iter_per_epoch = int(len(self.train_data) / self.config.batch_size)

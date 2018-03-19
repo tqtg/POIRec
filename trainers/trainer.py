@@ -2,6 +2,8 @@ from base.base_train import BaseTrain
 from tqdm import tqdm
 import numpy as np
 import math
+from utils import metrics
+
 
 class Trainer(BaseTrain):
   def __init__(self, sess, model, data, config, logger):
@@ -23,8 +25,8 @@ class Trainer(BaseTrain):
       self.offset += batch_size
       loop.set_postfix(loss=loss)
     loss = np.mean(losses)
-    acc = total_corrects / self.offset
-    print("loss={:.4f}, acc={:.4f}".format(loss, acc))
+    precision_at_k = total_corrects / self.offset
+    print("loss={:.4f}, precision@{}={:.4f}".format(loss, self.config.K, precision_at_k))
 
   def train_step(self):
     batch_x, batch_lengths, batch_y, batch_y_seq, batch_users, batch_size = next(
@@ -37,17 +39,17 @@ class Trainer(BaseTrain):
                  self.model.is_training: True}
     if self.config.seq2seq:
       feed_dict[self.model.labels_sequences] = batch_y_seq
-    _, step, loss, accuracy, num_corrects = self.sess.run([self.model.train_step,
-                                                           self.model.global_train_step_tensor,
-                                                           self.model.loss,
-                                                           self.model.accuracy,
-                                                           self.model.num_corrects],
-                                                          feed_dict=feed_dict)
+    _, step, loss, top_k = self.sess.run([self.model.train_step,
+                                          self.model.global_train_step_tensor,
+                                          self.model.loss,
+                                          self.model.top_k],
+                                         feed_dict=feed_dict)
     # print("iter={}, loss={:.4f}, acc={:.4f}".format(step * batch_size, loss, accuracy))
+    num_corrects = metrics.count_corrects(batch_y, top_k)
     if step % self.config.summarize_steps == 0:
       summaries_dict = {
-        'train_loss': loss,
-        'train_acc': accuracy,
+        'loss': loss,
+        # 'precision@{}'.format(self.config.K): num_corrects / batch_size
       }
       self.logger.summarize(step, summaries_dict=summaries_dict)
     return loss, num_corrects, batch_size
@@ -65,14 +67,14 @@ class Trainer(BaseTrain):
       self.offset += batch_size
       loop.set_postfix(loss=loss)
     loss = total_loss / self.offset
-    acc = total_corrects / self.offset
-    print("loss={:.4f}, acc={:.4f}".format(loss, acc))
-    if acc > self.best_acc:
+    precision_at_k = total_corrects / self.offset
+    print("loss={:.4f}, precision@{}={:.4f}".format(loss, self.config.K, precision_at_k))
+    if precision_at_k > self.best_precision:
       self.best_loss = loss
-      self.best_acc = acc
+      self.best_precision = precision_at_k
       self.best_epoch = self.sess.run(self.model.cur_epoch_tensor)
       # self.model.save(self.sess)
-    print("best_loss={:.4f}, best_acc={:.4f}, best_epoch={}\n".format(self.best_loss, self.best_acc, self.best_epoch))
+    print("best_loss={:.4f}, best_precision@{}={:.4f}, best_epoch={}\n".format(self.best_loss, self.config.K, self.best_precision, self.best_epoch))
 
   def test_step(self):
     batch_x, batch_lengths, batch_y, batch_y_seq, batch_users, batch_size = next(self.data.next_test_batch(self.offset))
@@ -83,16 +85,16 @@ class Trainer(BaseTrain):
                  self.model.is_training: False}
     if self.config.seq2seq:
       feed_dict[self.model.labels_sequences] = batch_y_seq
-    step, loss, accuracy, num_corrects = self.sess.run([self.model.increment_test_step_tensor,
-                                                        self.model.loss,
-                                                        self.model.accuracy,
-                                                        self.model.num_corrects],
-                                                       feed_dict=feed_dict)
+    step, loss, top_k = self.sess.run([self.model.increment_test_step_tensor,
+                                                                self.model.loss,
+                                                                self.model.top_k],
+                                                               feed_dict=feed_dict)
     # print("iter={}, loss={:.4f}, acc={:.4f}".format(step * batch_size, loss, accuracy))
+    num_corrects = metrics.count_corrects(batch_y, top_k)
     if step % int(self.config.summarize_steps) == 0:
       summaries_dict = {
-        'test_loss': loss,
-        'test_acc': accuracy,
+        'loss': loss,
+        # 'precision@{}'.format(self.config.K): num_corrects / batch_size
       }
       self.logger.summarize(step, summarizer="test", summaries_dict=summaries_dict)
     return loss, num_corrects, batch_size
