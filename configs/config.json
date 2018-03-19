@@ -3,7 +3,7 @@
   "data_set": "NYC",
   "cell": "GRU",
   "personalized": true,
-  "attention": false,
+  "attention": true,
   "seq2seq": false,
   "num_epochs": 30,
   "summarize_steps": 10,
