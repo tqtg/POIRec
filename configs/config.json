@@ -6,10 +6,11 @@
   "seq2seq": false,
   "num_epochs": 30,
   "summarize_steps": 10,
-  "batch_size": 32,
+  "batch_size": 128,
   "learning_rate": 1e-2,
   "dropout_rate": 0.5,
   "max_to_keep": 5,
   "num_hidden": 32,
-  "K": 1
+  "K": 1,
+  "distance_limit": 10
 }

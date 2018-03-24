@@ -1,3 +1,7 @@
+import os
+from math import pi
+
+import numpy as np
 import tensorflow as tf
 
 from base.base_model import BaseModel
@@ -23,11 +27,10 @@ class Model(BaseModel):
 
     batch_size = tf.shape(self.sequence_lengths)[0]
 
-    # Embedding layer
-    location_embeddings = tf.get_variable('loc_embedding_matrix', [self.config.num_loc + 1, self.config.num_hidden])
+    location_embeddings = tf.get_variable('loc_embeddings', [self.config.num_loc + 1, self.config.num_hidden])
     embedded_locations = tf.nn.embedding_lookup(location_embeddings, self.location_sequences)
 
-    user_embeddings = tf.get_variable('user_embedding_matrix', [self.config.num_user + 1, self.config.num_hidden])
+    user_embeddings = tf.get_variable('user_embeddings', [self.config.num_user + 1, self.config.num_hidden])
     embedded_users = tf.nn.embedding_lookup(user_embeddings, self.users)
     embedded_users = tf.expand_dims(embedded_users, axis=1)
     inputs = tf.multiply(embedded_users, embedded_locations)
@@ -38,10 +41,10 @@ class Model(BaseModel):
       # c, h
       c_init_state = tf.get_variable('c_init_state',
                                      [1, self.config.num_hidden],
-                                     initializer=tf.random_normal_initializer(stddev=0.1))
+                                     initializer=tf.constant_initializer(0.0))
       h_init_state = tf.get_variable('h_init_state',
                                      [1, self.config.num_hidden],
-                                     initializer=tf.random_normal_initializer(stddev=0.1))
+                                     initializer=tf.constant_initializer(0.0))
       init_state = (tf.tile(c_init_state, [batch_size, 1]), tf.tile(h_init_state, [batch_size, 1]))
       outputs, states = tf.nn.dynamic_rnn(cell, inputs,
                                           sequence_length=self.sequence_lengths,
@@ -51,7 +54,7 @@ class Model(BaseModel):
       cell = tf.nn.rnn_cell.GRUCell(self.config.num_hidden)
       init_state = tf.get_variable('init_state',
                                    [1, self.config.num_hidden],
-                                   initializer=tf.random_normal_initializer(stddev=0.1))
+                                   initializer=tf.constant_initializer(0.0))
       init_state = tf.tile(init_state, [batch_size, 1])
       outputs, final_state = tf.nn.dynamic_rnn(cell, inputs,
                                                sequence_length=self.sequence_lengths,
@@ -61,7 +64,7 @@ class Model(BaseModel):
       raise NotImplementedError
 
     # Add dropout, as the model otherwise quickly overfits
-    # outputs = tf.layers.dropout(outputs, self.config.dropout_rate, training=self.is_training)
+    outputs = tf.layers.dropout(outputs, self.config.dropout_rate, training=self.is_training)
 
     # next location indices
     idx = tf.range(batch_size) * tf.shape(outputs)[1] + (self.sequence_lengths - 1)
@@ -100,10 +103,57 @@ class Model(BaseModel):
       # count correct only for the last location in the sequences
       if self.config.seq2seq:
         logits = tf.gather(logits, idx)
+      predictions = tf.nn.softmax(logits)
+
+      # get predictions within distance_limit
+      geo = tf.get_variable('geo', shape=[self.config.num_loc + 1, 2],
+                            initializer=tf.constant_initializer(self.read_geo()),
+                            trainable=False) # [n, 2]
+      location_geo = tf.nn.embedding_lookup(geo, self.location_sequences) # [b, l, 2]
+      mean_geo = tf.divide(tf.reduce_sum(location_geo, axis=1, keep_dims=True),
+                           tf.reshape(tf.cast(self.sequence_lengths, tf.float32), [batch_size, 1, 1])) # [b, 1, 2]
+      geo = tf.expand_dims(geo, axis=0) # [1, n, 2]
+
+      distances = self.haversine(geo, mean_geo)
+      mask = tf.less_equal(distances, tf.constant(self.config.distance_limit, dtype=tf.float32))
+
+      predictions = tf.multiply(predictions, tf.cast(mask, tf.float32))
+      _, self.top_k = tf.nn.top_k(predictions, k=self.config.K)
+
       # self.correct_prediction = tf.equal(tf.cast(tf.argmax(logits, 1), tf.int32), self.next_locations)
       # self.num_corrects = tf.reduce_sum(tf.cast(self.correct_prediction, tf.int32))
       # self.accuracy = tf.reduce_mean(tf.cast(self.correct_prediction, tf.float32))
-      _, self.top_k = tf.nn.top_k(logits, k=self.config.K)
+
+
+  def haversine(self, mean_geo, geo):
+    lat1, lon1 = tf.split(geo, num_or_size_splits=2, axis=2)  # [1, n, 1]
+    lat2, lon2 = tf.split(mean_geo, num_or_size_splits=2, axis=2)  # [b, 1, 1]
+
+    dlat = self.radians(tf.subtract(lat2, lat1))  # [b, n, 1]
+    dlon = self.radians(tf.subtract(lon2, lon1))  # [b, n, 1]
+
+    a = tf.sin(dlat / 2) * tf.sin(dlat / 2) + tf.cos(self.radians(lat1)) \
+        * tf.cos(self.radians(lat2)) * tf.sin(dlon / 2) * tf.sin(dlon / 2)
+    c = 2 * tf.atan2(tf.sqrt(a), tf.sqrt(1 - a))
+
+    radius = tf.constant(6371, dtype=tf.float32)
+    d = radius * c  # [b, n, 1]
+    return tf.reshape(d, [-1, self.config.num_loc + 1])  # [b, n]
+
+
+  def radians(self, value):
+    return tf.multiply(value, tf.constant(pi / 180))
+
+
+  def read_geo(self):
+    print('Reading geo data...\n')
+    geo_matrix = np.zeros([self.config.num_loc + 1, 2])
+    with open(os.path.join('data/', self.config.data_set, "geo.txt")) as f:
+      for line in f:
+        tokens = line.strip().split()
+        geo_matrix[int(tokens[0]), 0] = float(tokens[1])
+        geo_matrix[int(tokens[0]), 1] = float(tokens[2])
+    return geo_matrix
 
 
   def init_saver(self):

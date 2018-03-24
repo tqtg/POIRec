@@ -1,7 +1,9 @@
-from base.base_train import BaseTrain
-from tqdm import tqdm
-import numpy as np
 import math
+
+import numpy as np
+from tqdm import tqdm
+
+from base.base_train import BaseTrain
 from utils import metrics
 
 
@@ -74,7 +76,8 @@ class Trainer(BaseTrain):
       self.best_precision = precision_at_k
       self.best_epoch = self.sess.run(self.model.cur_epoch_tensor)
       # self.model.save(self.sess)
-    print("best_loss={:.4f}, best_precision@{}={:.4f}, best_epoch={}\n".format(self.best_loss, self.config.K, self.best_precision, self.best_epoch))
+    print("best_epoch={}, loss={:.4f}, precision@{}={:.4f}\n".format(self.best_epoch, self.best_loss, self.config.K,
+                                                                     self.best_precision))
 
   def test_step(self):
     batch_x, batch_lengths, batch_y, batch_y_seq, batch_users, batch_size = next(self.data.next_test_batch(self.offset))
@@ -86,9 +89,9 @@ class Trainer(BaseTrain):
     if self.config.seq2seq:
       feed_dict[self.model.labels_sequences] = batch_y_seq
     step, loss, top_k = self.sess.run([self.model.increment_test_step_tensor,
-                                                                self.model.loss,
-                                                                self.model.top_k],
-                                                               feed_dict=feed_dict)
+                                       self.model.loss,
+                                       self.model.top_k],
+                                      feed_dict=feed_dict)
     # print("iter={}, loss={:.4f}, acc={:.4f}".format(step * batch_size, loss, accuracy))
     num_corrects = metrics.count_corrects(batch_y, top_k)
     if step % int(self.config.summarize_steps) == 0:
