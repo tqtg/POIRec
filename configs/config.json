@@ -11,6 +11,6 @@
   "dropout_rate": 0.5,
   "max_to_keep": 5,
   "num_hidden": 32,
-  "K": 1,
-  "distance_limit": 10
+  "K": 10,
+  "distance_limit": 50
 }
